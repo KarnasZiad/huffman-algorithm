@@ -1,0 +1,129 @@
+#include <iostream>
+#include <fstream>
+#include <queue>
+#include <unordered_map>
+#include <vector>
+#include <string>
+
+using namespace std;
+
+// Structure pour représenter un nœud dans l'arbre de Huffman
+struct HuffmanNode {
+    char caractere;
+    int occurence;
+    HuffmanNode* gauche;
+    HuffmanNode* droite;
+};
+
+// Comparateur personnalisé pour la file de priorité des nœuds de Huffman
+struct ComparateurHuffmanNode {
+    bool operator()(const HuffmanNode* a, const HuffmanNode* b) const {
+        return a->occurence > b->occurence; // Trie par occurence croissante
+    }
+};
+
+// Construit l'arbre de Huffman à partir de la fréquence des caractères
+HuffmanNode* construireArbreHuffman(const unordered_map<char, int>& frequences) {
+    // Création d'une file de priorité min pour stocker les nœuds
+    priority_queue<HuffmanNode*, vector<HuffmanNode*>, ComparateurHuffmanNode> filePriorite;
+
+    // Créer un nœud pour chaque caractère et les ajouter à la file de priorité
+  for (auto it = frequences.begin(); it != frequences.end(); ++it) {
+    char caractere = it->first;
+    int occurence = it->second;
+    HuffmanNode* nouveauNoeud = new HuffmanNode{caractere, occurence, nullptr, nullptr};
+    filePriorite.push(nouveauNoeud);
+}
+
+
+    // Construire l'arbre de Huffman
+    while (filePriorite.size() > 1) {
+        // Prendre les deux nœuds de la file de priorité ayant les fréquences les plus basses
+        HuffmanNode* gauche = filePriorite.top();
+        filePriorite.pop();
+        HuffmanNode* droite = filePriorite.top();
+        filePriorite.pop();
+
+        // Créer un nouveau nœud avec une fréquence égale à la somme des fréquences des deux nœuds précédents
+        HuffmanNode* parent = new HuffmanNode{'\0', gauche->occurence + droite->occurence, gauche, droite};
+        filePriorite.push(parent); // Ajouter le nouveau nœud à la file de priorité
+    }
+
+    // Le dernier nœud restant est la racine de l'arbre de Huffman
+    return filePriorite.top();
+}
+
+// Parcours récursif de l'arbre de Huffman pour générer les codes binaires
+void genererCodesBinaires(const HuffmanNode* racine, const string& codeActuel, unordered_map<char, string>& codesBinaires) {
+    if (racine->gauche == nullptr && racine->droite == nullptr) {
+        codesBinaires[racine->caractere] = codeActuel;
+        return;
+    }
+    genererCodesBinaires(racine->gauche, codeActuel + "0", codesBinaires);
+    genererCodesBinaires(racine->droite, codeActuel + "1", codesBinaires);
+}
+
+// Compression du texte en utilisant les codes binaires de Huffman
+string compresserTexte(const string& texte, const unordered_map<char, string>& codesBinaires) {
+    string texteEncode;
+    for (char caractere : texte) {
+        texteEncode += codesBinaires.at(caractere);
+    }
+    return texteEncode;
+}
+
+// Décompression du texte en utilisant l'arbre de Huffman
+string decompresserTexte(const string& texteEncode, HuffmanNode* racine) {
+    string texteDecode;
+    const HuffmanNode* courant = racine;
+    for (char bit : texteEncode) {
+        if (bit == '0') {
+            courant = courant->gauche;
+        } else {
+            courant = courant->droite;
+        }
+        if (courant->gauche == nullptr && courant->droite == nullptr) {
+            texteDecode += courant->caractere;
+            courant = racine;
+        }
+    }
+    return texteDecode;
+}
+
+int main() {
+    // Lire le fichier d'entrée
+    string nomFichierEntree = "input.txt";
+    ifstream fichierEntree(nomFichierEntree);
+    string texte((istreambuf_iterator<char>(fichierEntree)), istreambuf_iterator<char>());
+    fichierEntree.close();
+
+    // Calculer la fréquence des caractères dans le texte
+    unordered_map<char, int> frequences;
+    for (char caractere : texte) {
+        frequences[caractere]++;
+    }
+
+    // Construire l'arbre de Huffman
+    HuffmanNode* racineHuffman = construireArbreHuffman(frequences);
+
+    // Générer les codes binaires à partir de l'arbre de Huffman
+    unordered_map<char, string> codesBinaires;
+    genererCodesBinaires(racineHuffman, "", codesBinaires);
+
+    // Compression du texte
+    string texteEncode = compresserTexte(texte, codesBinaires);
+
+    // Afficher la taille de fichier compressé
+    cout << "Taille du fichier compressé : " << texteEncode.size() << " bits" << endl;
+
+    // Décompression du texte
+    string texteDecode = decompresserTexte(texteEncode, racineHuffman);
+
+    // Écrire le texte décompressé dans un fichier
+    string nomFichierSortie = "output.txt";
+    ofstream fichierSortie(nomFichierSortie);
+    fichierSortie << texteDecode;
+    fichierSortie.close();
+
+    return 0;
+}
